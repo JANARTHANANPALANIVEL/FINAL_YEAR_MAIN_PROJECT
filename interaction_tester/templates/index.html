@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Powered Web Testing</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs/editor/editor.main.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs/loader.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8">AI Powered Web Testing Automation</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Input Form -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <form id="testForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Website URL</label>
+                        <input type="url" id="url" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Website Type</label>
+                        <select id="websiteType" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">Select Type</option>
+                            <option value="ecommerce">E-commerce</option>
+                            <option value="static">Static Website</option>
+                            <option value="dynamic">Dynamic Website</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Custom Prompt (Optional)</label>
+                        <textarea id="customPrompt" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                    </div>
+
+                    <button type="submit" id="generateBtn" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                        <span class="generate-text">Generate Test Case</span>
+                        <div class="generate-progress hidden h-1 w-full bg-indigo-200 rounded-full">
+                            <div class="progress-bar h-1 bg-white rounded-full" style="width: 0%"></div>
+                        </div>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Test Case Editor -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Generated Test Case</h2>
+                    <button id="executeBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 hidden">
+                        <span class="execute-text">Execute Test</span>
+                        <div class="execute-progress hidden h-1 w-full bg-green-200 rounded-full">
+                            <div class="progress-bar h-1 bg-white rounded-full" style="width: 0%"></div>
+                        </div>
+                    </button>
+                </div>
+                <div id="editor" class="h-96 border rounded-md"></div>
+            </div>
+        </div>
+
+        <!-- Console Output -->
+        <div class="mt-8">
+            <div class="bg-gray-900 rounded-lg shadow-lg p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xl font-semibold text-white">Console Output</h2>
+                    <div class="space-x-2">
+                        <button id="retryBtn" class="text-gray-400 hover:text-white focus:outline-none hidden">
+                            Retry Test
+                        </button>
+                        <button id="clearConsole" class="text-gray-400 hover:text-white focus:outline-none">
+                            Clear Console
+                        </button>
+                    </div>
+                </div>
+                <div id="console" class="font-mono text-sm h-48 overflow-y-auto bg-black rounded p-4">
+                    <div class="text-green-500">// Console initialized. Ready for test execution.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTestId = null;
+        let hasErrors = false;
+        const consoleOutput = document.getElementById('console');
+        const retryBtn = document.getElementById('retryBtn');
+
+        function logToConsole(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: 'text-blue-400',
+                error: 'text-red-500',
+                success: 'text-green-500',
+                warning: 'text-yellow-400'
+            };
+            const div = document.createElement('div');
+            div.className = colors[type];
+            div.textContent = `[${timestamp}] ${message}`;
+            consoleOutput.appendChild(div);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        function parseErrorMessage(error) {
+            if (error.includes('ModuleNotFoundError')) {
+                return `Module Error: ${error.split(':').pop().trim()}`;
+            }
+            if (error.includes('SyntaxError')) {
+                return `Syntax Error: ${error.split(':').pop().trim()}`;
+            }
+            return error;
+        }
+
+        document.getElementById('clearConsole').addEventListener('click', () => {
+            consoleOutput.innerHTML = '';
+            logToConsole('Console cleared', 'info');
+            hasErrors = false;
+            retryBtn.classList.add('hidden');
+        });
+
+        retryBtn.addEventListener('click', async () => {
+            retryBtn.classList.add('hidden');
+            await executeTest();
+        });
+
+        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs' }});
+        require(['vs/editor/editor.main'], function() {
+            window.editor = monaco.editor.create(document.getElementById('editor'), {
+                value: '# Generated test case will appear here',
+                language: 'python',
+                theme: 'vs-dark',
+                automaticLayout: true
+            });
+
+            editor.onDidChangeModelContent(() => {
+                if (currentTestId) {
+                    const code = editor.getValue();
+                    fetch('/update-testcase', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            code,
+                            testId: currentTestId 
+                        })
+                    }).then(() => {
+                        logToConsole('Test case updated successfully', 'success');
+                        hasErrors = false;
+                    }).catch(error => {
+                        logToConsole(`Error updating test case: ${parseErrorMessage(error.message)}`, 'error');
+                        hasErrors = true;
+                    });
+                }
+            });
+        });
+
+        document.getElementById('testForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const generateBtn = document.getElementById('generateBtn');
+            const progressBar = generateBtn.querySelector('.generate-progress');
+            const progressBarFill = progressBar.querySelector('.progress-bar');
+            
+            generateBtn.disabled = true;
+            progressBar.classList.remove('hidden');
+            logToConsole('Generating test case...', 'info');
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 5;
+                progressBarFill.style.width = `${Math.min(progress, 90)}%`;
+            }, 100);
+
+            try {
+                const response = await fetch('/generate-testcase', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: document.getElementById('url').value,
+                        websiteType: document.getElementById('websiteType').value,
+                        customPrompt: document.getElementById('customPrompt').value
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    currentTestId = data.testId;
+                    window.editor.setValue(data.testCase);
+                    document.getElementById('executeBtn').classList.remove('hidden');
+                    logToConsole('Test case generated successfully', 'success');
+                    hasErrors = false;
+                } else {
+                    throw new Error(data.error || 'Failed to generate test case');
+                }
+            } catch (error) {
+                logToConsole(`Error: ${parseErrorMessage(error.message)}`, 'error');
+                hasErrors = true;
+            } finally {
+                clearInterval(interval);
+                progressBarFill.style.width = '100%';
+                setTimeout(() => {
+                    generateBtn.disabled = false;
+                    progressBar.classList.add('hidden');
+                    progressBarFill.style.width = '0%';
+                }, 500);
+            }
+        });
+
+        async function executeTest() {
+            const executeBtn = document.getElementById('executeBtn');
+            const progressBar = executeBtn.querySelector('.execute-progress');
+            const progressBarFill = progressBar.querySelector('.progress-bar');
+            
+            executeBtn.disabled = true;
+            progressBar.classList.remove('hidden');
+            logToConsole('Executing test case...', 'info');
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 5;
+                progressBarFill.style.width = `${Math.min(progress, 90)}%`;
+            }, 100);
+
+            try {
+                const response = await fetch('/execute-test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ testId: currentTestId })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    logToConsole('Test execution completed successfully', 'success');
+                    hasErrors = false;
+                    window.location.href = `/dashboard/${data.testId}`;
+                } else {
+                    throw new Error(data.error || 'Test execution failed');
+                }
+            } catch (error) {
+                const errorMsg = parseErrorMessage(error.message);
+                logToConsole(`Error: ${errorMsg}`, 'error');
+                hasErrors = true;
+                retryBtn.classList.remove('hidden');
+            } finally {
+                clearInterval(interval);
+                progressBarFill.style.width = '100%';
+                setTimeout(() => {
+                    executeBtn.disabled = false;
+                    progressBar.classList.add('hidden');
+                    progressBarFill.style.width = '0%';
+                }, 500);
+            }
+        }
+
+        document.getElementById('executeBtn').addEventListener('click', executeTest);
+    </script>
+</body>
+</html>

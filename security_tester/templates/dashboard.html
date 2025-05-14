@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Results Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-800: #1f2937;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--gray-800);
+            background-color: var(--gray-100);
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        .header h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--gray-800);
+            margin-bottom: 0.5rem;
+        }
+
+        .target-url {
+            color: var(--primary-color);
+            font-size: 1.1rem;
+        }
+
+
+
+        .chart-card {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .chart-card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--gray-800);
+        }
+
+        .stats-container {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-card {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+
+        .stat-card.high {
+            background-color: rgba(220, 53, 69, 0.1);
+            border: 1px solid rgba(220, 53, 69, 0.2);
+        }
+
+        .stat-card.medium {
+            background-color: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.2);
+        }
+
+        .stat-card.low {
+            background-color: rgba(40, 167, 69, 0.1);
+            border: 1px solid rgba(40, 167, 69, 0.2);
+        }
+
+        .stat-card.info {
+            background-color: rgba(23, 162, 184, 0.1);
+            border: 1px solid rgba(23, 162, 184, 0.2);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .severity-high { color: var(--danger-color); }
+        .severity-medium { color: var(--warning-color); }
+        .severity-low { color: var(--success-color); }
+        .severity-info { color: var(--info-color); }
+
+        .alert-table-container {
+            margin-top: 2rem;
+            overflow-x: auto;
+        }
+
+        .alert-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+            border-radius: 0.75rem;
+            overflow: hidden;
+        }
+
+        .alert-table th, 
+        .alert-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .alert-table th {
+            background-color: var(--gray-100);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.875rem;
+            letter-spacing: 0.05em;
+        }
+
+        .alert-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .alert-table tbody tr:hover {
+            background-color: var(--gray-100);
+        }
+
+        .download-btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 0.5rem;
+            margin-top: 2rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .download-btn:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Security Scan Results</h1>
+            <p class="target-url">Target URL: {{ target_url }}</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card high">
+                <div class="stat-value severity-high">{{ results.summary.High }}</div>
+                <div>High Risk</div>
+            </div>
+            <div class="stat-card medium">
+                <div class="stat-value severity-medium">{{ results.summary.Medium }}</div>
+                <div>Medium Risk</div>
+            </div>
+            <div class="stat-card low">
+                <div class="stat-value severity-low">{{ results.summary.Low }}</div>
+                <div>Low Risk</div>
+            </div>
+            <div class="stat-card info">
+                <div class="stat-value severity-info">{{ results.summary.Informational }}</div>
+                <div>Informational</div>
+            </div>
+        </div>
+
+
+        <div class="alert-table-container">
+            <h2>Detailed Findings</h2>
+            <table class="alert-table">
+                <thead>
+                    <tr>
+                        <th>Vulnerability</th>
+                        <th>Risk Level</th>
+                        <th>URL</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in results.alerts %}
+                    <tr>
+                        <td>{{ alert.name }}</td>
+                        <td class="severity-{{ alert.risk.lower() }}">{{ alert.risk }}</td>
+                        <td>{{ alert.url }}</td>
+                        <td>{{ alert.description }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <a href="/download/{{ pdf_filename }}" class="download-btn">Download PDF Report</a>
+    </div>
+
+    <script>
+        // Pie Chart
+        const pieCtx = document.getElementById('severityPieChart').getContext('2d');
+        new Chart(pieCtx, {
+            type: 'pie',
+            data: {
+                labels: ['High', 'Medium', 'Low', 'Informational'],
+                datasets: [{
+                    data: [
+                        {{ results.summary.High }},
+                        {{ results.summary.Medium }},
+                        {{ results.summary.Low }},
+                        {{ results.summary.Informational }}
+                    ],
+                    backgroundColor: [
+                        '#dc3545',
+                        '#ffc107',
+                        '#28a745',
+                        '#17a2b8'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Bar Chart
+        const barCtx = document.getElementById('severityBarChart').getContext('2d');
+        new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: ['High', 'Medium', 'Low', 'Informational'],
+                datasets: [{
+                    label: 'Number of Findings',
+                    data: [
+                        {{ results.summary.High }},
+                        {{ results.summary.Medium }},
+                        {{ results.summary.Low }},
+                        {{ results.summary.Informational }}
+                    ],
+                    backgroundColor: [
+                        '#dc3545',
+                        '#ffc107',
+                        '#28a745',
+                        '#17a2b8'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+
+        // Timeline Chart (simulated data)
+        const timeCtx = document.getElementById('timelineChart').getContext('2d');
+        new Chart(timeCtx, {
+            type: 'line',
+            data: {
+                labels: ['Start', '25%', '50%', '75%', 'Complete'],
+                datasets: [{
+                    label: 'Vulnerabilities Found',
+                    data: [0, 
+                        {{ results.summary.High + results.summary.Medium }}, 
+                        {{ results.summary.High + results.summary.Medium + results.summary.Low }},
+                        {{ results.summary.High + results.summary.Medium + results.summary.Low + results.summary.Informational }},
+                        {{ results.summary.High + results.summary.Medium + results.summary.Low + results.summary.Informational }}
+                    ],
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

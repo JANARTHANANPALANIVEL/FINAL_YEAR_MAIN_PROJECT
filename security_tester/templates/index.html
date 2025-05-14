@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Security Scanner</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-800: #1f2937;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--gray-100);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: var(--gray-800);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.25rem;
+            font-weight: 700;
+        }
+
+        .scan-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        input[type="url"] {
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        input[type="url"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        button {
+            padding: 14px 24px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background-color: var(--gray-200);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-container {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background-color: var(--gray-200);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-status {
+            text-align: center;
+            color: var(--gray-800);
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .scan-stages {
+            margin-top: 20px;
+            padding: 0;
+            list-style: none;
+        }
+
+        .scan-stage {
+            padding: 10px;
+            margin: 5px 0;
+            background-color: var(--gray-100);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            opacity: 0.5;
+        }
+
+        .scan-stage.active {
+            background-color: rgba(37, 99, 235, 0.1);
+            opacity: 1;
+            font-weight: 500;
+        }
+
+        .scan-stage.completed {
+            opacity: 1;
+            background-color: rgba(40, 167, 69, 0.1);
+        }
+
+        .scan-stage::before {
+            content: "○";
+            margin-right: 10px;
+        }
+
+        .scan-stage.active::before {
+            content: "●";
+            color: var(--primary-color);
+        }
+
+        .scan-stage.completed::before {
+            content: "✓";
+            color: var(--success-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Website Security Scanner</h1>
+        <form class="scan-form" id="scanForm">
+            <input type="url" name="url" placeholder="Enter website URL (e.g., https://example.com)" required>
+            <button type="submit" id="submitBtn">Start Scan</button>
+        </form>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-status" id="progressStatus">Initializing scan...</div>
+            
+            <ul class="scan-stages" id="scanStages">
+                <li class="scan-stage" data-stage="0">Initializing ZAP Scanner</li>
+                <li class="scan-stage" data-stage="1">Spider Crawling</li>
+                <li class="scan-stage" data-stage="2">Passive Scanning</li>
+                <li class="scan-stage" data-stage="3">Active Scanning</li>
+                <li class="scan-stage" data-stage="4">Analyzing Results</li>
+                <li class="scan-stage" data-stage="5">Generating Report</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('scanForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressStatus = document.getElementById('progressStatus');
+        const scanStages = document.getElementById('scanStages');
+        
+        let currentStage = 0;
+        let statusCheckInterval;
+
+        function updateProgress(stage, progress) {
+            progressFill.style.width = `${progress}%`;
+            progressStatus.textContent = stage;
+            
+            // Update stages
+            const stages = scanStages.getElementsByClassName('scan-stage');
+            for (let i = 0; i < stages.length; i++) {
+                if (i < currentStage) {
+                    stages[i].classList.add('completed');
+                    stages[i].classList.remove('active');
+                } else if (i === currentStage) {
+                    stages[i].classList.add('active');
+                    stages[i].classList.remove('completed');
+                } else {
+                    stages[i].classList.remove('completed', 'active');
+                }
+            }
+        }
+
+        function checkStatus() {
+            fetch(`/scan-status?stage=${currentStage}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.complete) {
+                        clearInterval(statusCheckInterval);
+                        return;
+                    }
+                    updateProgress(data.stage, data.progress);
+                    currentStage++;
+                });
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            progressContainer.style.display = 'block';
+            currentStage = 0;
+            
+            const formData = new FormData(form);
+            
+            try {
+                // Start status checking
+                statusCheckInterval = setInterval(checkStatus, 2000);
+                
+                // Submit the scan
+                const response = await fetch('/scan', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Scan failed');
+                }
+                
+                // If response is HTML (success), replace the current page
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('text/html')) {
+                    document.documentElement.innerHTML = await response.text();
+                }
+            } catch (error) {
+                clearInterval(statusCheckInterval);
+                progressStatus.textContent = `Error: ${error.message}`;
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

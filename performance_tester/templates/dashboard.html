@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Test Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8">Performance Test Results</h1>
+        
+        <div class="max-w-6xl mx-auto space-y-8">
+            <!-- Metrics Grid -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Performance Metrics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {% for metric, data in metrics.items() %}
+                    <div class="p-4 border rounded-lg">
+                        <h3 class="font-semibold text-lg mb-2">{{ metric | replace('-', ' ') | title }}</h3>
+                        <div class="space-y-2">
+                            <div class="relative pt-1">
+                                <div class="flex mb-2 items-center justify-between">
+                                    <div>
+                                        <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full 
+                                            {% if data.score >= 0.9 %}bg-green-200 text-green-800
+                                            {% elif data.score >= 0.7 %}bg-blue-200 text-blue-800
+                                            {% elif data.score >= 0.5 %}bg-yellow-200 text-yellow-800
+                                            {% else %}bg-red-200 text-red-800{% endif %}">
+                                            Score: {{ "%.2f"|format(data.score) }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
+                                    <div style="width:{{ data.score * 100 }}%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center 
+                                        {% if data.score >= 0.9 %}bg-green-500
+                                        {% elif data.score >= 0.7 %}bg-blue-500
+                                        {% elif data.score >= 0.5 %}bg-yellow-500
+                                        {% else %}bg-red-500{% endif %}">
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-gray-600">
+                                Value: <span class="font-medium">{{ "%.2f"|format(data.value) }}ms</span>
+                            </p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Charts -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Score Chart -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4">Performance Scores</h2>
+                    <canvas id="scoreChart"></canvas>
+                </div>
+                
+                <!-- Timeline Chart -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4">Timing Analysis</h2>
+                    <canvas id="timelineChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Download Button -->
+            <div class="text-center mt-8">
+                <a href="/download-report/{{ test_id }}"
+                   class="inline-block bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Download Detailed PDF Report
+                </a>
+                
+                <a href="/"
+                   class="inline-block ml-4 bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                    Run Another Test
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Prepare data for charts
+        const metrics = {{ metrics|tojson }};
+        const labels = Object.keys(metrics).map(key => key.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+        const scores = Object.values(metrics).map(m => m.score);
+        const values = Object.values(metrics).map(m => m.value);
+        
+        // Score Chart
+        new Chart(document.getElementById('scoreChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Performance Score',
+                    data: scores,
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 1
+                    }
+                }
+            }
+        });
+        
+        // Timeline Chart
+        new Chart(document.getElementById('timelineChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Time (ms)',
+                    data: values,
+                    fill: false,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
